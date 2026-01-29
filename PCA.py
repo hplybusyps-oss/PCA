@@ -124,6 +124,46 @@ st.markdown("""
     """, unsafe_allow_html=True)
 st.title("📊 Process Capability Analysis v0.0")
 
+# --- [추가됨] 초기 화면에만 표시되는 데이터 예시 섹션 ---
+if not st.session_state.analysis_active:
+    with st.expander("ℹ️ 데이터 입력 형식 가이드 & 예시 파일 다운로드 (Click)", expanded=True):
+        st.markdown("""
+        ### 📂 데이터 준비 방법
+        분석 정확도를 위해 아래 형식을 권장합니다.
+        1. **첫 번째 행(Header):** 데이터의 이름(예: `VIA H`, `Length`, `Weight`)을 적어주세요.
+        2. **두 번째 행부터:** 실제 측정값(숫자)만 입력해주세요.
+        """)
+        
+        # 예시 데이터 생성
+        example_df = pd.DataFrame({
+            "VIA H (예시)": [0.402, 0.405, 0.398, 0.410, 0.401, "...", 0.403],
+            "Length (예시)": [10.5, 10.2, 10.8, 10.4, 10.6, "...", 10.5]
+        })
+        
+        c1, c2 = st.columns([1, 2])
+        
+        with c1:
+            st.write("#### 👀 데이터 미리보기")
+            st.dataframe(example_df, hide_index=True, use_container_width=True)
+        
+        with c2:
+            st.write("#### 💾 샘플 파일 다운로드")
+            st.write("테스트용 샘플 데이터를 다운로드해서 바로 분석해보세요.")
+            
+            # 실제 다운로드용 샘플 데이터 (숫자만 있는 버전)
+            sample_csv_df = pd.DataFrame({
+                "Measurement_Data": [0.426, 0.452, 0.413, 0.426, 0.413, 0.387, 0.452, 0.452, 0.401] * 10
+            })
+            csv_sample = sample_csv_df.to_csv(index=False).encode('utf-8-sig')
+            
+            st.download_button(
+                label="📥 예시 CSV 파일 다운로드",
+                data=csv_sample,
+                file_name="Sample_Data.csv",
+                mime="text/csv",
+                type="primary"
+            )
+
 # 세션 상태 초기화 (열 변경 감지용)
 if 'current_col' not in st.session_state:
     st.session_state.current_col = None
@@ -591,4 +631,5 @@ if not data.empty:
 
 else:
     st.info("👈 상단의 업로드 박스에 데이터를 넣고 [Process Capability Analysis Start] 버튼을 눌러주세요.")
+
 
