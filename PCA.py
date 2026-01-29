@@ -110,7 +110,7 @@ def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height
         current_y -= line_height_rel
 
 # 1. 페이지 설정
-st.set_page_config(page_title=" Pro - Expert Report", layout="wide")
+st.set_page_config(page_title="Process Capability Analysis-HJ", layout="wide")
 
 # --- [추가됨] 도움말(툴팁) 박스 크기 확장 CSS ---
 st.markdown("""
@@ -591,3 +591,4 @@ if not data.empty:
 
 else:
     st.info("👈 상단의 업로드 박스에 데이터를 넣고 [Process Capability Analysis Start] 버튼을 눌러주세요.")
+
