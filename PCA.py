@@ -112,6 +112,12 @@ def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height
 # 1. 페이지 설정
 st.set_page_config(page_title="Process Capability Analysis-HJ", layout="wide")
 
+# 세션 상태 초기화 (열 변경 감지용)
+if 'current_col' not in st.session_state:
+    st.session_state.current_col = None
+if 'analysis_active' not in st.session_state:
+    st.session_state.analysis_active = False
+
 # --- [추가됨] 도움말(툴팁) 박스 크기 확장 CSS ---
 st.markdown("""
     <style>
@@ -163,12 +169,6 @@ if not st.session_state.analysis_active:
                 mime="text/csv",
                 type="primary"
             )
-
-# 세션 상태 초기화 (열 변경 감지용)
-if 'current_col' not in st.session_state:
-    st.session_state.current_col = None
-if 'analysis_active' not in st.session_state:
-    st.session_state.analysis_active = False
 
 # 2. 사이드바 설정 (설정값만 배치)
 with st.sidebar:
@@ -631,6 +631,7 @@ if not data.empty:
 
 else:
     st.info("👈 상단의 업로드 박스에 데이터를 넣고 [Process Capability Analysis Start] 버튼을 눌러주세요.")
+
 
 
 
