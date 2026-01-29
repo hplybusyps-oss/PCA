@@ -111,6 +111,17 @@ def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height
 
 # 1. 페이지 설정
 st.set_page_config(page_title=" Pro - Expert Report", layout="wide")
+
+# --- [추가됨] 도움말(툴팁) 박스 크기 확장 CSS ---
+st.markdown("""
+    <style>
+    /* 툴팁 박스 크기 강제 확장 */
+    div[data-baseweb="popover"] {
+        min-width: 500px !important;
+        max-width: 800px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 st.title("📊 Process Capability Analysis v0.0")
 
 # 세션 상태 초기화 (열 변경 감지용)
@@ -198,9 +209,22 @@ if not data.empty:
             m_cols[4].metric("Cpk", f"{cpk:.2f}")
             m_cols[5].metric("Sigma Level", f"{sigma_lvl:.2f}σ")
 
-            tab1, tab2, tab3 = st.tabs(["📉 공정능력 리포트", "📈 관리도", "📋 정규성 검정 리포트"])
+            tab1, tab2, tab3 = st.tabs(["📊 공정능력 리포트", "📈 관리도", "📋 정규성 검정 리포트"])
 
             with tab1:
+                st.subheader("Process Capability Histogram", help="""
+**📊 공정능력 리포트란?**
+
+현재 공정이 고객이 요구하는 규격(LSL~USL) 내에서 제품을 얼마나 잘 생산할 수 있는지 보여줍니다.
+
+**👀 확인 포인트:**
+1. **히스토그램(막대):** 데이터가 중심(Mean)에 모여 있고, 규격 내에 들어와 있나요?
+2. **파란 곡선:** 종 모양의 정규분포 곡선이 규격 범위를 벗어나지 않나요?
+3. **Cp vs Cpk:** 
+   - **Cp:** 치우침을 무시한 공정의 잠재적 능력 (높을수록 좋음)
+   - **Cpk:** 실제 공정 능력 (보통 1.33 이상이면 합격, 1.67 이상이면 매우 우수)
+""")
+                
                 # --- 미니탭 스타일 Pretty Binning 로직 ---
                 if x_axis_mode == "자동 (Auto)":
                     d_min, d_max = data.min(), data.max()
@@ -272,6 +296,20 @@ if not data.empty:
                 st.plotly_chart(fig, use_container_width=False, config={'toImageButtonOptions': {'filename': f'Process_Capability_{column_name}'}})
 
             with tab2:
+                # [추가됨] 도움말이 포함된 소제목
+                st.subheader("Xbar-R Control Chart", help="""
+**📈 관리도(Control Chart)란?**
+
+공정이 시간 흐름에 따라 통계적으로 안정된 상태(관리 상태)인지 확인하는 도구입니다.
+
+**👀 확인 포인트:**
+1. **Xbar (위쪽 차트):** 공정의 **중심(평균)**이 변하는지 봅니다.
+2. **R (아래쪽 차트):** 공정의 **산포(흩어짐)**가 일정한지 봅니다.
+3. **이상 징후:** 
+   - 점이 빨간색 점선(UCL, LCL) 밖으로 나가는 경우 (특수 원인 발생)
+   - 점들이 한쪽으로 쏠리거나 경향을 보이는 경우
+""")
+                
                 # --- 상단에 추가할 계수 데이터 (Minitab 표준, n=2~10 확장형) ---
                 factors = {
                     2: (1.880, 3.267, 0),
@@ -402,6 +440,20 @@ if not data.empty:
                     st.warning("데이터 개수가 부족하여 Xbar-R 관리도를 생성할 수 없습니다.")
 
             with tab3:
+                # [추가됨] 도움말이 포함된 소제목
+                st.subheader("Probability Plot (Normality Test)", help="""
+**📋 정규성 검정(Probability Plot)이란?**
+
+수집된 데이터가 통계적으로 '정규분포(종 모양)'를 따르는지 검증합니다. Cpk 분석은 데이터가 정규분포임을 가정하므로 매우 중요합니다.
+
+**👀 확인 포인트:**
+1. **파란 점(데이터)이 빨간 선(직선) 위에 있나요?**
+   - 점들이 직선 위에 얌전히 올라타 있어야 정규분포입니다.
+   - S자로 휘거나 끝부분이 크게 벗어나면 정규성이 깨진 것입니다.
+2. **P-Value (유의확률):**
+   - **P ≥ 0.05:** 정규분포라고 가정할 수 있습니다. (Good 👍)
+   - **P < 0.05:** 정규분포가 아닙니다. (데이터가 치우쳤거나 이상점이 있음)
+""")
                 # 1. 데이터 정렬 및 이론적 분위수 계산
                 sorted_data = np.sort(data)
                 n_total = len(data)
