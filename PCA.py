@@ -582,8 +582,8 @@ if not data.empty:
             df_raw = pd.DataFrame({f"Raw Data ({column_name})": data.values})
             csv_raw = df_raw.to_csv(index=False)
             
-            # 3. 두 CSV 문자열을 결합 (중간에 빈 줄 2개 삽입하여 엑셀에서 보기 좋게 분리)
-            final_csv_str = csv_summary + "\n\n" + csv_raw
+            # 3. 두 CSV 문자열을 결합 (중간에 빈 줄 삽입하여 엑셀에서 보기 좋게 분리)
+            final_csv_str = csv_summary + "\n" + csv_raw
             
             # 한글 깨짐 방지를 위해 utf-8-sig로 인코딩
             csv_bytes = final_csv_str.encode('utf-8-sig')
