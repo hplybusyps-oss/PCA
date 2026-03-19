@@ -309,36 +309,10 @@ if not data.empty:
                                        showarrow=False, font=dict(color=color, size=12), yanchor="bottom")
 
                 # --- [수정됨] Y축 모드에 따른 설정 로직 (제목 변수 적용) ---
-                # if y_axis_mode == "자동 (Auto)":
-                #     y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', rangemode="tozero")
-                # else:
-                #     y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step)
-                # --- [수정됨] 하단 빈 공간 완전 제거 로직 (강제성 부여) ---
                 if y_axis_mode == "자동 (Auto)":
-                    counts, _ = np.histogram(data, bins=np.arange(start_val, data.max() + bin_size*2, bin_size))
-                    y_max_auto = max(np.max(counts), np.max(y_pdf)) * 1.15
-                    
-                    y_axis_setup = dict(
-                        title=y_axis_title, 
-                        showgrid=True, 
-                        gridcolor='#F2F3F4', 
-                        range=[0, y_max_auto],
-                        autorange=False,         # 1. 자동 여백 확장 기능 강제 종료
-                        rangemode="nonnegative", # 2. 마이너스 영역 원천 차단
-                        zeroline=True,           # 3. Y=0 위치에 기준선 긋기
-                        zerolinecolor='black'
-                    )
+                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', rangemode="tozero")
                 else:
-                    y_axis_setup = dict(
-                        title=y_axis_title, 
-                        showgrid=True, 
-                        gridcolor='#F2F3F4', 
-                        range=[y_min_val, y_max_val], 
-                        dtick=y_step,
-                        autorange=False,         # 수동 모드에서도 여백 확장 금지
-                        zeroline=True,
-                        zerolinecolor='black'
-                    )
+                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step)
 
                 fig.update_layout(
                     title=dict(text=f"Process Capability Report for {column_name}", x=0.5, xanchor='center', font=dict(size=24)),
@@ -600,12 +574,23 @@ if not data.empty:
                 {"Report": "Normality Test", "Category": "Test Result", "Metric": "P-Value", "Value": f"{p_val:.4f}"}
             ]
             
+            # 1. 요약 데이터를 CSV 문자열로 변환
             df_res = pd.DataFrame(summary_data)
-            csv = df_res.to_csv(index=False).encode('utf-8-sig')
+            csv_summary = df_res.to_csv(index=False)
+            
+            # 2. 원본(Raw) 데이터를 데이터프레임으로 만들고 CSV 문자열로 변환
+            df_raw = pd.DataFrame({f"Raw Data ({column_name})": data.values})
+            csv_raw = df_raw.to_csv(index=False)
+            
+            # 3. 두 CSV 문자열을 결합 (중간에 빈 줄 2개 삽입하여 엑셀에서 보기 좋게 분리)
+            final_csv_str = csv_summary + "\n\n" + csv_raw
+            
+            # 한글 깨짐 방지를 위해 utf-8-sig로 인코딩
+            csv_bytes = final_csv_str.encode('utf-8-sig')
             
             st.download_button(
                 label=f"📥 {column_name} 통합 분석 결과 CSV 다운로드",
-                data=csv,
+                data=csv_bytes,
                 file_name=f"Process_Analysis_{column_name}.csv",
                 mime="text/csv"
             )
