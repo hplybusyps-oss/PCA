@@ -127,7 +127,7 @@ st.markdown("""
     }
     </style>
     """, unsafe_allow_html=True)
-st.title("📊 Process Capability Analysis v0.0")
+st.title("📊 Process Capability Analysis v0.1")
 
 # 3. 데이터 가이드 섹션
 with st.expander("ℹ️ 데이터 입력 형식 가이드 & 예시 파일 다운로드 (Click)", expanded=False):
@@ -309,15 +309,36 @@ if not data.empty:
                                        showarrow=False, font=dict(color=color, size=12), yanchor="bottom")
 
                 # --- [수정됨] Y축 모드에 따른 설정 로직 (제목 변수 적용) ---
+                # if y_axis_mode == "자동 (Auto)":
+                #     y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', rangemode="tozero")
+                # else:
+                #     y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step)
+                # --- [수정됨] 하단 빈 공간 완전 제거 로직 (강제성 부여) ---
                 if y_axis_mode == "자동 (Auto)":
-                    # 막대그래프의 실제 빈도수와 곡선의 최고점 중 더 높은 값을 찾습니다.
                     counts, _ = np.histogram(data, bins=np.arange(start_val, data.max() + bin_size*2, bin_size))
-                    y_max_auto = max(np.max(counts), np.max(y_pdf)) * 1.15  # 위쪽 여백 15%만 추가
+                    y_max_auto = max(np.max(counts), np.max(y_pdf)) * 1.15
                     
-                    # range를 [0, 최대값]으로 강제하여 0 밑의 공간을 없앱니다.
-                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[0, y_max_auto])
+                    y_axis_setup = dict(
+                        title=y_axis_title, 
+                        showgrid=True, 
+                        gridcolor='#F2F3F4', 
+                        range=[0, y_max_auto],
+                        autorange=False,         # 1. 자동 여백 확장 기능 강제 종료
+                        rangemode="nonnegative", # 2. 마이너스 영역 원천 차단
+                        zeroline=True,           # 3. Y=0 위치에 기준선 긋기
+                        zerolinecolor='black'
+                    )
                 else:
-                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step)
+                    y_axis_setup = dict(
+                        title=y_axis_title, 
+                        showgrid=True, 
+                        gridcolor='#F2F3F4', 
+                        range=[y_min_val, y_max_val], 
+                        dtick=y_step,
+                        autorange=False,         # 수동 모드에서도 여백 확장 금지
+                        zeroline=True,
+                        zerolinecolor='black'
+                    )
 
                 fig.update_layout(
                     title=dict(text=f"Process Capability Report for {column_name}", x=0.5, xanchor='center', font=dict(size=24)),
