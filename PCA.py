@@ -310,7 +310,12 @@ if not data.empty:
 
                 # --- [수정됨] Y축 모드에 따른 설정 로직 (제목 변수 적용) ---
                 if y_axis_mode == "자동 (Auto)":
-                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', rangemode="tozero")
+                    # 막대그래프의 실제 빈도수와 곡선의 최고점 중 더 높은 값을 찾습니다.
+                    counts, _ = np.histogram(data, bins=np.arange(start_val, data.max() + bin_size*2, bin_size))
+                    y_max_auto = max(np.max(counts), np.max(y_pdf)) * 1.15  # 위쪽 여백 15%만 추가
+                    
+                    # range를 [0, 최대값]으로 강제하여 0 밑의 공간을 없앱니다.
+                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[0, y_max_auto])
                 else:
                     y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step)
 
