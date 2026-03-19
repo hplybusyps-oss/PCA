@@ -185,16 +185,16 @@ with st.sidebar:
     if x_axis_mode == "수동 (Manual)":
         x_min_val = st.number_input("X축 최소값", value=lsl - 0.05, format="%.3f")
         x_max_val = st.number_input("X축 최대값", value=usl + 0.05, format="%.3f")
-        x_step = st.number_input("X축 눈금 단위 (Bin Size)", value=0.020, format="%.3f", min_value=0.001)
-    
+        x_step = st.number_input("X축 눈금 단위 (Bin Size)", value=0.020, format="%.3f", min_value=0.001)    
     x_axis_title = st.text_input("X축 제목", value="Measurement Value")
 
-    st.write("**[Y축 설정 (Histogram)]**")
+    st.write("**[Y축 설정]**")
     y_axis_mode = st.radio("Y축 범위 모드", ["자동 (Auto)", "수동 (Manual)"])
     if y_axis_mode == "수동 (Manual)":
         y_min_val = st.number_input("Y축 최소값", value=0.0, format="%.1f")
         y_max_val = st.number_input("Y축 최대값", value=500.0, format="%.1f")
         y_step = st.number_input("Y축 눈금 단위", value=50.0, format="%.1f", min_value=0.1)
+    y_axis_title = st.text_input("Y축 제목", value="Frequency")    
     
     st.write("---")
     subgroup_size = st.number_input("관리도 시료군(n) 크기", value=5, min_value=1)
@@ -308,19 +308,17 @@ if not data.empty:
                     fig.add_annotation(x=val, y=1.02, yref="paper", text=f"<b>{name}</b>", 
                                        showarrow=False, font=dict(color=color, size=12), yanchor="bottom")
 
-                # --- [추가됨] Y축 모드에 따른 설정 로직 ---
+                # --- [수정됨] Y축 모드에 따른 설정 로직 (제목 변수 적용) ---
                 if y_axis_mode == "자동 (Auto)":
-                    # rangemode="tozero"를 추가하여 0 밑으로 내려가는 여백을 없앱니다.
-                    y_axis_setup = dict(title="Frequency", showgrid=True, gridcolor='#F2F3F4', rangemode="tozero")
+                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', rangemode="tozero")
                 else:
-                    # 수동 모드일 때는 사용자가 입력한 범위와 눈금을 적용합니다.
-                    y_axis_setup = dict(title="Frequency", showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step)
+                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step)
 
                 fig.update_layout(
                     title=dict(text=f"Process Capability Report for {column_name}", x=0.5, xanchor='center', font=dict(size=24)),
                     template="simple_white", hovermode="x",
                     xaxis=dict(title=x_axis_title, dtick=display_dtick, range=x_range_vals, showgrid=True, gridcolor='#F2F3F4'),
-                    yaxis=y_axis_setup, # <-- [수정됨] 위에서 정의한 y_axis_setup을 적용
+                    yaxis=y_axis_setup, 
                     width=1200, height=650, margin=dict(l=60, r=220, t=120, b=60), showlegend=False
                 )
                 
