@@ -4,7 +4,7 @@ import numpy as np
 from scipy import stats
 from scipy.stats import norm
 import plotly.graph_objects as go
-import matplotlib.pyplot as plt
+import math # [추가됨] 미니탭 c4 상수 계산용
 import io
 
 # --- 용어 설명 딕셔너리 (툴팁 내용) ---
@@ -14,7 +14,7 @@ TOOLTIPS = {
     "USL": "상한규격 (Upper Specification Limit)<br>제품이 가져야 할 최대 허용치입니다.",
     "Sample N": "시료 수 (Sample Size)<br>분석에 사용된 데이터의 총 개수입니다.",
     "Mean": "평균 (Mean)<br>데이터들의 중심 위치(산술 평균)입니다.",
-    "StDev (Within)": "군내 표준편차 (단기)<br>부분군 내의 변동이나 이동범위(MR)를 통해 예측한 표준편차입니다.<br>Cpk 계산에 사용됩니다.",
+    "StDev (Within)": "군내 표준편차 (단기)<br>부분군 내의 변동을 합동 표준편차(Pooled)로 예측한 값입니다.<br>Cpk 계산에 사용됩니다.",
     "StDev (Overall)": "전체 표준편차 (장기)<br>모든 데이터의 단순 표본 표준편차입니다.<br>Ppk 계산에 사용됩니다.",
     "Cp": "잠재적 공정능력 (단기)<br>치우침을 고려하지 않은 단기 공정 능력입니다.",
     "Cpk": "실제 공정능력 (단기)<br>치우침을 반영한 단기 공정 능력입니다. (미니탭 Cpk와 동일)",
@@ -31,6 +31,11 @@ TOOLTIPS = {
 
 # --- 미니탭 표준편차 추정을 위한 d2 상수표 ---
 D2_TABLE = {2: 1.128, 3: 1.693, 4: 2.059, 5: 2.326, 6: 2.534, 7: 2.704, 8: 2.847, 9: 2.970, 10: 3.078}
+
+# --- [추가됨] 미니탭 합동 표준편차 보정용 불편화 상수(c4) 유도 함수 ---
+def get_c4(n):
+    if n <= 1: return 1.0
+    return math.sqrt(2.0/(n-1)) * math.exp(math.lgamma(n/2.0) - math.lgamma((n-1)/2.0))
 
 def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height=650):
     PX_LINE_HEIGHT = 28     
@@ -112,7 +117,7 @@ st.markdown("""
     div[data-baseweb="popover"] { min-width: 500px !important; max-width: 800px !important; }
     </style>
     """, unsafe_allow_html=True)
-st.title("📊 Process Capability Analysis v0.3 (Minitab Std.)")
+st.title("📊 Process Capability Analysis v0.4 (Minitab Pooled Std.)")
 
 # 3. 데이터 가이드 섹션
 with st.expander("ℹ️ 데이터 입력 형식 가이드 & 예시 파일 다운로드 (Click)", expanded=False):
@@ -141,7 +146,6 @@ with st.sidebar:
     st.subheader("📏 규격치 (Specs)")
     st.caption("※ 하한이나 상한이 없는 경우, 숫자를 완전히 지워 빈칸으로 두세요.")
     
-    # 빈칸 입력을 허용하기 위해 텍스트 인풋으로 변경
     lsl_str = st.text_input("하한규격 (LSL)", value="25.0")
     target_str = st.text_input("목표치 (Target)", value="")
     usl_str = st.text_input("상한규격 (USL)", value="")
@@ -181,7 +185,7 @@ with st.sidebar:
     y_axis_title = st.text_input("Y축 제목", value="Frequency")    
     
     st.write("---")
-    subgroup_size = st.number_input("관리도 및 군내변동 시료군(n) 크기", value=1, min_value=1, help="1로 설정 시 이동범위(Moving Range)로 Cpk를 계산합니다.")
+    subgroup_size = st.number_input("관리도 및 군내변동 시료군(n) 크기", value=5, min_value=1, help="1로 설정 시 이동범위(Moving Range) 방식 적용")
 
 # 3. 메인 화면 - 데이터 로드 로직
 data = pd.Series(dtype=float)
@@ -219,28 +223,35 @@ if not data.empty:
         n_total = len(data)
         mean = data.mean()
         
-        # --- [추가/수정됨] Minitab 방식 표준편차 계산 로직 ---
-        std_overall = data.std(ddof=1) # 장기 표준편차 (전체)
+        # 장기 표준편차 (전체)
+        std_overall = data.std(ddof=1) 
         
-        # 단기 표준편차 (군내 변동) 추정
-        n_sub = subgroup_size
-        std_within = std_overall # 기본값 (계산 실패 대비)
+        # --- [완벽 수정됨] 미니탭 방식: 합동 표준편차(Pooled StdDev) 계산 로직 ---
+        n_sub = int(subgroup_size)
+        std_within = std_overall # 기본값
         
         if n_sub == 1 and n_total > 1:
-            # Moving Range (이동범위) 방식
+            # 1. Moving Range (이동범위) 방식 (n=1)
             mr = np.abs(np.diff(data))
             mr_bar = np.mean(mr)
-            std_within = mr_bar / D2_TABLE.get(2, 1.128)
-        elif n_sub > 1 and n_total >= n_sub:
-            # R-bar (부분군 범위 평균) 방식
-            num_subgroups = n_total // n_sub
-            subgroup_data = data.values[:num_subgroups * n_sub].reshape(-1, n_sub)
-            ranges = subgroup_data.max(axis=1) - subgroup_data.min(axis=1)
-            r_bar = ranges.mean()
-            d2_val = D2_TABLE.get(n_sub, 3.0) 
-            std_within = r_bar / d2_val
+            std_within = mr_bar / 1.128
+        elif n_sub > 1 and n_total > 1:
+            # 2. Pooled Standard Deviation (합동 표준편차) 방식 (자투리 데이터 포함)
+            groups = [data.values[i:i + n_sub] for i in range(0, n_total, n_sub)]
+            valid_groups = [g for g in groups if len(g) > 1] # 분산 계산이 가능한 그룹만 추출
             
-        # 공정능력(Cp, Cpk, Pp, Ppk) 계산 통합 함수
+            if len(valid_groups) > 0:
+                ni = np.array([len(g) for g in valid_groups])
+                variances = np.array([np.var(g, ddof=1) for g in valid_groups])
+                
+                df_i = ni - 1
+                df_total = np.sum(df_i)
+                if df_total > 0:
+                    sp = np.sqrt(np.sum(df_i * variances) / df_total)
+                    c4_val = get_c4(df_total + 1)
+                    std_within = sp / c4_val
+            
+        # 공정능력 계산 통합 함수 (편측 규격 완벽 대응)
         def calc_capability(std_val):
             cpu = (usl - mean) / (3 * std_val) if (usl is not None and std_val > 0) else None
             cpl = (mean - lsl) / (3 * std_val) if (lsl is not None and std_val > 0) else None
@@ -264,9 +275,9 @@ if not data.empty:
         # 빈칸(None)일 경우 "N/A" 처리 함수
         def fmt(val, dec=3): return f"{val:.{dec}f}" if val is not None else "N/A"
 
-        st.markdown(f"## 📋 {column_name} 분석 요약 지표 (Minitab Std.)")
+        st.markdown(f"## 📋 {column_name} 분석 요약 지표")
         
-        st.write("**[ 단기 공정능력 (Within) - 이동범위/부분군 반영 ]**")
+        st.write("**[ 단기 공정능력 (Within) - 이동범위 및 합동 표준편차 반영 ]**")
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("샘플 수 (N)", f"{n_total}")
         c2.metric("평균 (Mean)", fmt(mean, 3))
@@ -330,7 +341,6 @@ if not data.empty:
             fig.add_trace(go.Scatter(x=x_curve, y=y_pdf_within, mode='lines', line=dict(color='#1B4F72', width=3), 
                                      name="Normal (Within)", hovertemplate="Normal Dist: %{y:.2f}<extra></extra>"))
 
-            # 가이드라인 (값이 있는 것만 추가 & Target 글자 겹침 방지 적용)
             guides = []
             if lsl is not None: guides.append((lsl, "LSL", "#E74C3C", 1.02))
             if usl is not None: guides.append((usl, "USL", "#E74C3C", 1.02))
@@ -388,25 +398,73 @@ if not data.empty:
                 {"label": "Ppk", "value": fmt(ppk, 2)},
             ]
             add_interactive_summary_box(fig, summary_items, fig_height=650)
-
             st.plotly_chart(fig, use_container_width=False, config={'toImageButtonOptions': {'filename': f'Process_Capability_{column_name}'}})
 
         with tab2:
-            st.subheader("Control Chart", help="관리도 시료군 크기가 1이면 에러 방지를 위해 Xbar-R 차트는 그려지지 않습니다.")
-            
-            n = subgroup_size
-            if n > 1 and len(data) >= n * 2: 
-                num_subgroups = len(data) // n
-                subgroup_data = data.values[:num_subgroups * n].reshape(-1, n)
+            # 관리도 탭: n=1일 때는 I-MR, n>1일 때는 Xbar-R 출력
+            if n_sub == 1:
+                st.subheader("I-MR (Individual - Moving Range) Control Chart")
+                individuals = data.values
+                mr = np.abs(np.diff(individuals))
+                mean_i, mr_bar = np.mean(individuals), np.mean(mr)
+                
+                ucl_i, lcl_i = mean_i + 3 * (mr_bar / 1.128), mean_i - 3 * (mr_bar / 1.128)
+                ucl_mr, lcl_mr = 3.267 * mr_bar, 0
+                
+                i_colors = ['red' if (x > ucl_i or x < lcl_i) else '#2E86C1' for x in individuals]
+                mr_colors = ['red' if (r > ucl_mr or r < lcl_mr) else '#2E86C1' for r in mr]
+                
+                from plotly.subplots import make_subplots
+                fig_c = make_subplots(rows=2, cols=1, subplot_titles=("<b>Individual Chart</b>", "<b>Moving Range Chart</b>"), vertical_spacing=0.20)
+                
+                fig_c.add_trace(go.Scatter(y=individuals, mode='lines+markers', line=dict(color='#2E86C1', width=1.5), marker=dict(color=i_colors, size=6), name="Individual"), row=1, col=1)
+                fig_c.add_trace(go.Scatter(x=np.arange(1, len(individuals)), y=mr, mode='lines+markers', line=dict(color='#2E86C1', width=1.5), marker=dict(color=mr_colors, size=6), name="Moving Range"), row=2, col=1)
+                
+                def add_cl(fig, val, name, color, dash, row):
+                    fig.add_hline(y=val, line_dash=dash, line_color=color, line_width=1.5, row=row, col=1)
+                    fig.add_annotation(xref="paper", x=1.01, y=val, yref=f"y{row}" if row==1 else "y2", text=f"<b>{name}</b>", showarrow=False, font=dict(color=color, size=12), xanchor="left", yanchor="middle")
+
+                add_cl(fig_c, ucl_i, "UCL", "red", "dash", 1)
+                add_cl(fig_c, mean_i, "Mean", "green", "dash", 1)
+                add_cl(fig_c, lcl_i, "LCL", "red", "dash", 1)
+                add_cl(fig_c, ucl_mr, "UCL", "red", "dash", 2)
+                add_cl(fig_c, mr_bar, "MR-bar", "green", "dash", 2)
+                add_cl(fig_c, lcl_mr, "LCL", "red", "dash", 2)
+
+                fig_c.update_layout(title=dict(text=f"<b>I-MR Charts for {column_name}</b>", x=0.5, xanchor='center', font=dict(size=24)), template="simple_white", height=750, width=1200, showlegend=False, margin=dict(l=60, r=220, t=100, b=80), hovermode="x unified")
+                fig_c.update_yaxes(title_text="Individual Value", showgrid=True, gridcolor='#F2F3F4', row=1, col=1)
+                fig_c.update_yaxes(title_text="Moving Range", showgrid=True, gridcolor='#F2F3F4', row=2, col=1)
+
+                summary_items = [
+                    {"label": "I-MR Chart", "is_header": True},
+                    {"label": "Subgroup Size", "value": "1"},
+                    {"label": "Sample N", "value": f"{len(data)}"},
+                    {"label": "", "value": "", "is_header": False},
+                    {"label": "I Chart Limits", "is_header": True},
+                    {"label": "UCL", "value": f"{ucl_i:.3f}"},
+                    {"label": "Mean", "value": f"{mean_i:.3f}"},
+                    {"label": "LCL", "value": f"{lcl_i:.3f}"},
+                    {"label": "", "value": "", "is_header": False},
+                    {"label": "MR Limits", "is_header": True},
+                    {"label": "UCL", "value": f"{ucl_mr:.3f}"},
+                    {"label": "MR-bar", "value": f"{mr_bar:.3f}"},
+                ]
+                add_interactive_summary_box(fig_c, summary_items, x_pos=1.06, fig_height=750)
+                st.plotly_chart(fig_c, use_container_width=False, config={'toImageButtonOptions': {'filename': f'IMR_Chart_{column_name}'}})
+
+            elif n_sub > 1 and len(data) >= n_sub * 2: 
+                st.subheader("Xbar-R Control Chart", help="깔끔한 기준선을 위해 딱 떨어지는 묶음(그룹)까지만 차트에 타점됩니다.")
+                num_subgroups = len(data) // n_sub
+                subgroup_data = data.values[:num_subgroups * n_sub].reshape(-1, n_sub)
                 
                 x_bars = subgroup_data.mean(axis=1)
                 ranges = subgroup_data.max(axis=1) - subgroup_data.min(axis=1)
                 subgroup_indices = np.arange(1, num_subgroups + 1)
                 
-                a2, d4, d3 = 3/np.sqrt(n), 2.114, 0
-                if n in D2_TABLE:
+                a2, d4, d3 = 3/np.sqrt(n_sub), 2.114, 0
+                if n_sub in D2_TABLE:
                     factors = {2:(1.880,3.267,0), 3:(1.023,2.574,0), 4:(0.729,2.282,0), 5:(0.577,2.114,0), 6:(0.483,2.004,0), 7:(0.419,1.924,0.076), 8:(0.373,1.864,0.136), 9:(0.337,1.816,0.184), 10:(0.308,1.777,0.223)}
-                    a2, d4, d3 = factors.get(n)
+                    a2, d4, d3 = factors.get(n_sub)
                     
                 x_double_bar = x_bars.mean()
                 r_bar = ranges.mean()
@@ -435,10 +493,14 @@ if not data.empty:
                 add_cl(fig_c, lcl_r, "LCL", "red", "dash", 2)
 
                 fig_c.update_layout(title=dict(text=f"<b>Control Charts for {column_name}</b>", x=0.5, xanchor='center', font=dict(size=24)), template="simple_white", height=750, width=1200, showlegend=False, margin=dict(l=60, r=220, t=100, b=80), hovermode="x unified")
+                fig_c.update_yaxes(title_text="Sample Mean", showgrid=True, gridcolor='#F2F3F4', row=1, col=1)
+                fig_c.update_xaxes(title_text="Subgroup Number", showgrid=True, gridcolor='#F2F3F4', row=1, col=1)
+                fig_c.update_yaxes(title_text="Sample Range", showgrid=True, gridcolor='#F2F3F4', row=2, col=1)
+                fig_c.update_xaxes(title_text="Subgroup Number", showgrid=True, gridcolor='#F2F3F4', row=2, col=1)
                 
                 summary_items = [
-                    {"label": "Control Chart", "is_header": True},
-                    {"label": "Subgroup Size", "value": f"{n}"},
+                    {"label": "Control Chart Stats", "is_header": True},
+                    {"label": "Subgroup Size", "value": f"{n_sub}"},
                     {"label": "Sample N", "value": f"{len(data)}"},
                     {"label": "", "value": "", "is_header": False},
                     {"label": "Xbar Limits", "is_header": True},
@@ -454,7 +516,7 @@ if not data.empty:
                 add_interactive_summary_box(fig_c, summary_items, x_pos=1.06, fig_height=750)
                 st.plotly_chart(fig_c, use_container_width=False, config={'toImageButtonOptions': {'filename': f'Control_Chart_{column_name}'}})
             else:
-                st.warning("⚠️ 부분군 크기(Subgroup Size)가 1이거나 데이터가 부족하여 Xbar-R 관리도를 생성할 수 없습니다.")
+                st.warning("⚠️ 데이터 개수가 부족하여 Xbar-R 관리도를 생성할 수 없습니다.")
 
         with tab3:
             st.subheader("Probability Plot (Normality Test)")
