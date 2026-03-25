@@ -163,10 +163,26 @@ with st.sidebar:
     
     st.write("---")
     st.subheader("📏 규격치 (Specs)")
-    st.caption("※ 하한이나 상한이 없는 경우, 숫자를 지워 빈칸으로 두세요.")
-    lsl = st.number_input("하한규격 (LSL)", value=0.150, format="%.4f")
-    target = st.number_input("목표치 (Target)", value=0.450, format="%.4f")
-    usl = st.number_input("상한규격 (USL)", value=0.750, format="%.4f")
+    st.caption("※ 하한이나 상한이 없는 경우, 숫자를 완전히 지워 빈칸으로 두세요.")
+    
+    # 1. 일반 텍스트 입력창으로 변경하여 빈칸 입력을 강제로 허용합니다.
+    lsl_str = st.text_input("하한규격 (LSL)", value="0.150")
+    target_str = st.text_input("목표치 (Target)", value="0.450")
+    usl_str = st.text_input("상한규격 (USL)", value="0.750")
+    
+    # 2. 텍스트를 숫자로 변환하는 함수 (빈칸이거나 문자가 섞이면 None 반환)
+    def parse_spec(val_str):
+        if not val_str.strip():
+            return None
+        try:
+            return float(val_str.strip())
+        except ValueError:
+            st.sidebar.error("⚠️ 숫자로 변환할 수 없는 값이 포함되어 빈칸으로 처리됩니다.")
+            return None
+
+    lsl = parse_spec(lsl_str)
+    target = parse_spec(target_str)
+    usl = parse_spec(usl_str)
     
     st.write("---")
     st.subheader("🌐 그래프 컨트롤")
