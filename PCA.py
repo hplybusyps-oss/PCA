@@ -303,6 +303,7 @@ if not data.empty:
                 else: pretty_step = 10.0 * magnitude
                 
                 bin_size = pretty_step
+                start_val = np.floor(d_min / bin_size) * bin_size - (bin_size / 2)
                 
                 # 규격이 없을 경우 데이터 최솟값/최댓값을 기준
                 plot_min_val = min(d_min, lsl) if lsl is not None else d_min
