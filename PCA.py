@@ -286,6 +286,9 @@ if not data.empty:
                     plot_max = np.ceil(max(d_max, usl) / bin_size) * bin_size + bin_size
                     x_range_vals = [plot_min, plot_max]
                     display_dtick = bin_size
+                    st.session_state.auto_x_min = float(plot_min)
+                    st.session_state.auto_x_max = float(plot_max)
+                    st.session_state.auto_x_step = float(bin_size)
                 else:
                     x_range_vals = [x_min_val, x_max_val]
                     bin_size = x_step
@@ -314,9 +317,25 @@ if not data.empty:
 
                 # --- [수정됨] Y축 모드에 따른 설정 로직 (제목 변수 적용) ---
                 if y_axis_mode == "자동 (Auto)":
-                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', rangemode="tozero")
+                    counts, _ = np.histogram(data, bins=np.arange(start_val, data.max() + bin_size*2, bin_size))
+                    y_max_auto = max(np.max(counts), np.max(y_pdf)) * 1.15
+                    
+                    # Y축 세팅값 세션에 저장
+                    st.session_state.auto_y_min = 0.0
+                    st.session_state.auto_y_max = float(y_max_auto)
+                    
+                    # 수동 전환 시 쓸 Y축 눈금 단위 대략적 계산
+                    raw_y_step = y_max_auto / 10
+                    mag_y = 10 ** np.floor(np.log10(raw_y_step)) if raw_y_step > 0 else 1
+                    res_y = raw_y_step / mag_y
+                    if res_y <= 2: pretty_y_step = 2.0 * mag_y
+                    elif res_y <= 5: pretty_y_step = 5.0 * mag_y
+                    else: pretty_y_step = 10.0 * mag_y
+                    st.session_state.auto_y_step = float(pretty_y_step)
+
+                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[0, y_max_auto], autorange=False, rangemode="nonnegative")
                 else:
-                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step)
+                    y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step, autorange=False)
 
                 fig.update_layout(
                     title=dict(text=f"Process Capability Report for {column_name}", x=0.5, xanchor='center', font=dict(size=24)),
