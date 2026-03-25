@@ -308,11 +308,15 @@ if not data.empty:
                                          name="Normal", hovertemplate="Normal Dist: %{y:.2f}<extra></extra>"))
 
                 # 가이드라인 (점선)
-                guides = [(lsl, "LSL", "#E74C3C"), (usl, "USL", "#E74C3C"), (mean, "Mean", "#27AE60"), (target, "Target", "#7F8C8D")]
-                # (기존의 가이드라인 추가 코드 아래 부분입니다)
-                for val, name, color in guides:
+                guides = [
+                    (lsl, "LSL", "#E74C3C", 1.02), 
+                    (usl, "USL", "#E74C3C", 1.02), 
+                    (mean, "Mean", "#27AE60", 1.02), 
+                    (target, "Target", "#7F8C8D", 1.07) # Target 글자만 살짝 더 위로(1.07) 올립니다.
+                ]
+                for val, name, color, y_pos in guides:
                     fig.add_vline(x=val, line_dash="dash", line_color=color, line_width=1.5)
-                    fig.add_annotation(x=val, y=1.02, yref="paper", text=f"<b>{name}</b>", 
+                    fig.add_annotation(x=val, y=y_pos, yref="paper", text=f"<b>{name}</b>", 
                                        showarrow=False, font=dict(color=color, size=12), yanchor="bottom")
 
                 # --- [수정됨] Y축 모드에 따른 설정 로직 (제목 변수 적용) ---
