@@ -14,25 +14,25 @@ TOOLTIPS = {
     "USL": "상한규격 (Upper Specification Limit)<br>제품이 가져야 할 최대 허용치입니다.",
     "Sample N": "시료 수 (Sample Size)<br>분석에 사용된 데이터의 총 개수입니다.",
     "Mean": "평균 (Mean)<br>데이터들의 중심 위치(산술 평균)입니다.",
-    "StDev": "표준편차 (Standard Deviation)<br>데이터가 평균으로부터 흩어진 정도를 나타냅니다.",
-    "Cp": "공정능력지수 (Process Capability)<br>치우침을 고려하지 않은 공정의 잠재적 능력입니다.<br>((USL - LSL) / 6σ)",
-    "Cpk": "실제 공정능력지수 (Process Capability Index)<br>데이터 평균의 치우침을 반영한 실제 공정 능력입니다.<br>(min(Cpu, Cpl))",
+    "StDev (Within)": "군내 표준편차 (단기)<br>부분군 내의 변동이나 이동범위(MR)를 통해 예측한 표준편차입니다.<br>Cpk 계산에 사용됩니다.",
+    "StDev (Overall)": "전체 표준편차 (장기)<br>모든 데이터의 단순 표본 표준편차입니다.<br>Ppk 계산에 사용됩니다.",
+    "Cp": "잠재적 공정능력 (단기)<br>치우침을 고려하지 않은 단기 공정 능력입니다.",
+    "Cpk": "실제 공정능력 (단기)<br>치우침을 반영한 단기 공정 능력입니다. (미니탭 Cpk와 동일)",
+    "Pp": "잠재적 공정성능 (장기)<br>치우침을 고려하지 않은 장기 공정 능력입니다.",
+    "Ppk": "실제 공정성능 (장기)<br>치우침을 반영한 장기 공정 능력입니다. (미니탭 Ppk와 동일)",
     "Sigma Level": "시그마 수준 (Sigma Level)<br>공정의 불량률을 나타내는 지표로, 높을수록 불량이 적습니다.<br>(3 × Cpk)",
     "Subgroup Size": "부분군 크기 (Subgroup Size)<br>한 번 샘플링할 때 묶는 데이터의 개수입니다.",
-    "Total Points": "전체 데이터 수<br>관리도에 타점된 총 점의 개수입니다.",
     "UCL": "관리상한 (Upper Control Limit)<br>공정의 우연 원인에 의한 자연스러운 변동의 상한선입니다.",
     "CL": "중심선 (Center Line)<br>공정 데이터의 평균적인 수준을 나타내는 기준선입니다.",
     "LCL": "관리하한 (Lower Control Limit)<br>공정의 우연 원인에 의한 자연스러운 변동의 하한선입니다.",
-    "R-bar": "범위 평균 (Average Range)<br>각 부분군 내의 범위(최댓값-최솟값)들의 평균입니다.",
     "AD Stat": "Anderson-Darling 통계량<br>데이터가 정규분포를 따르는지 검정하는 수치입니다.<br>값이 작을수록 정규분포에 가깝습니다.",
     "P-Value": "유의확률 (P-Value)<br>정규성 검정의 판단 기준입니다.<br>0.05 이상이면 정규분포를 따른다고 판단합니다."
 }
 
+# --- 미니탭 표준편차 추정을 위한 d2 상수표 ---
+D2_TABLE = {2: 1.128, 3: 1.693, 4: 2.059, 5: 2.326, 6: 2.534, 7: 2.704, 8: 2.847, 9: 2.970, 10: 3.078}
+
 def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height=650):
-    """
-    그래프 높이(px)가 달라도 글자 간격(px)을 절대적으로 고정하여
-    모든 탭에서 시각적으로 완벽하게 동일한 밀도를 유지하는 함수
-    """
     PX_LINE_HEIGHT = 28     
     PX_SECTION_GAP = 5      
     PX_PADDING = 15         
@@ -97,13 +97,11 @@ def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height
             hovertext=hover_text,
             bgcolor="rgba(0,0,0,0)"
         )
-        
         current_y -= line_height_rel
 
 # 1. 페이지 설정
 st.set_page_config(page_title="Process Capability Analysis-HJ", layout="wide")
 
-# 세션 상태 초기화
 if 'current_col' not in st.session_state:
     st.session_state.current_col = None
 if 'analysis_active' not in st.session_state:
@@ -111,71 +109,46 @@ if 'analysis_active' not in st.session_state:
 
 st.markdown("""
     <style>
-    div[data-baseweb="popover"] {
-        min-width: 500px !important;
-        max-width: 800px !important;
-    }
+    div[data-baseweb="popover"] { min-width: 500px !important; max-width: 800px !important; }
     </style>
     """, unsafe_allow_html=True)
-st.title("📊 Process Capability Analysis v0.2")
+st.title("📊 Process Capability Analysis v0.3 (Minitab Std.)")
 
 # 3. 데이터 가이드 섹션
 with st.expander("ℹ️ 데이터 입력 형식 가이드 & 예시 파일 다운로드 (Click)", expanded=False):
     st.markdown("""
     ### 📂 데이터 준비 방법
-    분석 정확도를 위해 아래 형식을 권장합니다.
     1. **첫 번째 행(Header):** 데이터의 이름(예: `Length`, `Weight`)을 적어주세요.
     2. **두 번째 행부터:** 실제 측정값(숫자)만 입력해주세요.
     """)
-    
-    example_df = pd.DataFrame({
-        "Length (예시)": [0.402, 0.405, 0.398, 0.410, 0.401, "...", 0.403],
-        "Weight (예시)": [10.5, 10.2, 10.8, 10.4, 10.6, "...", 10.5]
-    })
-    
+    example_df = pd.DataFrame({"Length (예시)": [0.402, 0.405, 0.398, 0.410, 0.401, "...", 0.403]})
     c1, c2 = st.columns([1, 2])
-    
     with c1:
         st.write("#### 👀 데이터 미리보기")
         st.dataframe(example_df, hide_index=True, use_container_width=True)
-    
     with c2:
         st.write("#### 💾 샘플 파일 다운로드")
-        st.write("테스트용 샘플 데이터를 다운로드해서 바로 분석해보세요.")
-        
-        sample_csv_df = pd.DataFrame({
-            "Measurement_Data": [0.426, 0.452, 0.413, 0.426, 0.413, 0.387, 0.452, 0.452, 0.401] * 10
-        })
+        sample_csv_df = pd.DataFrame({"Measurement_Data": [0.426, 0.452, 0.413, 0.426, 0.413, 0.387, 0.452, 0.452, 0.401] * 10})
         csv_sample = sample_csv_df.to_csv(index=False).encode('utf-8-sig')
-        
-        st.download_button(
-            label="📥 예시 CSV 파일 다운로드",
-            data=csv_sample,
-            file_name="Sample_Data.csv",
-            mime="text/csv",
-            type="primary"
-        )
+        st.download_button(label="📥 예시 CSV 파일 다운로드", data=csv_sample, file_name="Sample_Data.csv", mime="text/csv", type="primary")
 
 # 2. 사이드바 설정
 with st.sidebar:
     st.header("⚙️ 분석 설정")
-    input_method = st.radio("데이터 입력 방식", ["파일 백업", "데이터 붙여넣기"])
+    input_method = st.radio("데이터 입력 방식", ["파일 업로드", "데이터 붙여넣기"])
     
     st.write("---")
     st.subheader("📏 규격치 (Specs)")
     st.caption("※ 하한이나 상한이 없는 경우, 숫자를 완전히 지워 빈칸으로 두세요.")
     
-    # 1. 일반 텍스트 입력창으로 변경하여 빈칸 입력을 강제로 허용합니다.
-    lsl_str = st.text_input("하한규격 (LSL)", value="0.150")
-    target_str = st.text_input("목표치 (Target)", value="0.450")
-    usl_str = st.text_input("상한규격 (USL)", value="0.750")
+    # 빈칸 입력을 허용하기 위해 텍스트 인풋으로 변경
+    lsl_str = st.text_input("하한규격 (LSL)", value="25.0")
+    target_str = st.text_input("목표치 (Target)", value="")
+    usl_str = st.text_input("상한규격 (USL)", value="")
     
-    # 2. 텍스트를 숫자로 변환하는 함수 (빈칸이거나 문자가 섞이면 None 반환)
     def parse_spec(val_str):
-        if not val_str.strip():
-            return None
-        try:
-            return float(val_str.strip())
+        if not val_str.strip(): return None
+        try: return float(val_str.strip())
         except ValueError:
             st.sidebar.error("⚠️ 숫자로 변환할 수 없는 값이 포함되어 빈칸으로 처리됩니다.")
             return None
@@ -190,11 +163,11 @@ with st.sidebar:
     st.write("**[X축 설정]**")
     x_axis_mode = st.radio("X축 범위 모드", ["자동 (Auto)", "수동 (Manual)"])
     if x_axis_mode == "수동 (Manual)":
-        x_min_default = lsl - 0.05 if lsl is not None else 0.0
-        x_max_default = usl + 0.05 if usl is not None else 1.0
+        x_min_default = lsl - 5.0 if lsl is not None else 0.0
+        x_max_default = usl + 5.0 if usl is not None else 50.0
         x_min_val = st.number_input("X축 최소값", value=st.session_state.get('auto_x_min', x_min_default), format="%.5f")
         x_max_val = st.number_input("X축 최대값", value=st.session_state.get('auto_x_max', x_max_default), format="%.5f")
-        x_step = st.number_input("X축 눈금 단위 (Bin Size)", value=st.session_state.get('auto_x_step', 0.020), format="%.5f", min_value=0.00001)
+        x_step = st.number_input("X축 눈금 단위 (Bin Size)", value=st.session_state.get('auto_x_step', 1.0), format="%.5f", min_value=0.00001)
     
     x_axis_title = st.text_input("X축 제목", value="Measurement Value")
 
@@ -202,19 +175,19 @@ with st.sidebar:
     y_axis_mode = st.radio("Y축 범위 모드", ["자동 (Auto)", "수동 (Manual)"])
     if y_axis_mode == "수동 (Manual)":
         y_min_val = st.number_input("Y축 최소값", value=st.session_state.get('auto_y_min', 0.0), format="%.1f")
-        y_max_val = st.number_input("Y축 최대값", value=st.session_state.get('auto_y_max', 500.0), format="%.1f")
-        y_step = st.number_input("Y축 눈금 단위", value=st.session_state.get('auto_y_step', 50.0), format="%.1f", min_value=0.1)
+        y_max_val = st.number_input("Y축 최대값", value=st.session_state.get('auto_y_max', 50.0), format="%.1f")
+        y_step = st.number_input("Y축 눈금 단위", value=st.session_state.get('auto_y_step', 5.0), format="%.1f", min_value=0.1)
         
     y_axis_title = st.text_input("Y축 제목", value="Frequency")    
     
     st.write("---")
-    subgroup_size = st.number_input("관리도 시료군(n) 크기", value=5, min_value=1)
+    subgroup_size = st.number_input("관리도 및 군내변동 시료군(n) 크기", value=1, min_value=1, help="1로 설정 시 이동범위(Moving Range)로 Cpk를 계산합니다.")
 
 # 3. 메인 화면 - 데이터 로드 로직
 data = pd.Series(dtype=float)
 column_name = ""
 
-if input_method == "파일 백업":
+if input_method == "파일 업로드":
     uploaded_file = st.file_uploader("엑셀/CSV 파일을 업로드하세요 (첫 줄은 제목)", type=['csv', 'xlsx'])
     if uploaded_file:
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
@@ -238,59 +211,81 @@ if not data.empty:
     if st.session_state.current_col != column_name:
         st.session_state.current_col = column_name
         st.session_state.analysis_active = False
-        st.warning(f"⚠️ 분석 대상이 '{column_name}'으로 변경되었습니다. 버튼을 눌러 분석을 시작하세요.")
 
     if run_analysis:
         st.session_state.analysis_active = True
 
     if st.session_state.analysis_active:
-        # 기초 통계 계산
-        mean, std = data.mean(), data.std(ddof=1)
+        n_total = len(data)
+        mean = data.mean()
         
-        # 한쪽 규격만 있는 경우 처리
-        cpu = (usl - mean) / (3 * std) if (usl is not None and std > 0) else None
-        cpl = (mean - lsl) / (3 * std) if (lsl is not None and std > 0) else None
+        # --- [추가/수정됨] Minitab 방식 표준편차 계산 로직 ---
+        std_overall = data.std(ddof=1) # 장기 표준편차 (전체)
         
-        if cpu is not None and cpl is not None:
-            cp = (usl - lsl) / (6 * std) if std > 0 else 0
-            cpk = min(cpu, cpl)
-        elif cpu is not None:
-            cp = None 
-            cpk = cpu
-        elif cpl is not None:
-            cp = None
-            cpk = cpl
-        else:
-            cp = None
-            cpk = None
+        # 단기 표준편차 (군내 변동) 추정
+        n_sub = subgroup_size
+        std_within = std_overall # 기본값 (계산 실패 대비)
+        
+        if n_sub == 1 and n_total > 1:
+            # Moving Range (이동범위) 방식
+            mr = np.abs(np.diff(data))
+            mr_bar = np.mean(mr)
+            std_within = mr_bar / D2_TABLE.get(2, 1.128)
+        elif n_sub > 1 and n_total >= n_sub:
+            # R-bar (부분군 범위 평균) 방식
+            num_subgroups = n_total // n_sub
+            subgroup_data = data.values[:num_subgroups * n_sub].reshape(-1, n_sub)
+            ranges = subgroup_data.max(axis=1) - subgroup_data.min(axis=1)
+            r_bar = ranges.mean()
+            d2_val = D2_TABLE.get(n_sub, 3.0) 
+            std_within = r_bar / d2_val
             
-        sigma_lvl = 3 * cpk if cpk is not None else None
-        
-        # 규격 정합성 체크 (양쪽 규격 모두 있을 때만)
-        if lsl is not None and usl is not None:
-            spec_range = usl - lsl
-            if not (lsl - spec_range < mean < usl + spec_range):
-                st.error(f"❌ 규격({lsl}~{usl})과 데이터 평균({mean:.3f})의 차이가 너무 큽니다. 규격 설정을 확인해주세요.")
+        # 공정능력(Cp, Cpk, Pp, Ppk) 계산 통합 함수
+        def calc_capability(std_val):
+            cpu = (usl - mean) / (3 * std_val) if (usl is not None and std_val > 0) else None
+            cpl = (mean - lsl) / (3 * std_val) if (lsl is not None and std_val > 0) else None
+            
+            if cpu is not None and cpl is not None:
+                cx = (usl - lsl) / (6 * std_val) if std_val > 0 else 0
+                cxk = min(cpu, cpl)
+            elif cpu is not None:
+                cx, cxk = None, cpu
+            elif cpl is not None:
+                cx, cxk = None, cpl
+            else:
+                cx, cxk = None, None
                 
+            sigma = 3 * cxk if cxk is not None else None
+            return cx, cxk, sigma
+
+        cp, cpk, sigma_within = calc_capability(std_within)
+        pp, ppk, sigma_overall = calc_capability(std_overall)
+        
         # 빈칸(None)일 경우 "N/A" 처리 함수
         def fmt(val, dec=3): return f"{val:.{dec}f}" if val is not None else "N/A"
 
-        st.markdown(f"## 📋 {column_name} 분석 요약 지표")
-        m_cols = st.columns(6)
-        m_cols[0].metric("샘플 수 (N)", f"{len(data)}")
-        m_cols[1].metric("평균 (Mean)", fmt(mean, 3))
-        m_cols[2].metric("표준편차 (σ)", fmt(std, 3))
-        m_cols[3].metric("Cp", fmt(cp, 2))
-        m_cols[4].metric("Cpk", fmt(cpk, 2))
-        m_cols[5].metric("Sigma Level", f"{sigma_lvl:.2f}σ" if sigma_lvl is not None else "N/A")
+        st.markdown(f"## 📋 {column_name} 분석 요약 지표 (Minitab Std.)")
+        
+        st.write("**[ 단기 공정능력 (Within) - 이동범위/부분군 반영 ]**")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("샘플 수 (N)", f"{n_total}")
+        c2.metric("평균 (Mean)", fmt(mean, 3))
+        c3.metric("StDev (Within)", fmt(std_within, 4))
+        c4.metric("Cpk (단기능력)", fmt(cpk, 2))
+        c5.metric("Sigma Level", f"{sigma_within:.2f}σ" if sigma_within is not None else "N/A")
+
+        st.write("**[ 장기 공정능력 (Overall) - 전체 산포 반영 ]**")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("부분군 크기 (n)", f"{n_sub}")
+        c2.metric("LSL / USL", f"{fmt(lsl, 1)} / {fmt(usl, 1)}")
+        c3.metric("StDev (Overall)", fmt(std_overall, 4))
+        c4.metric("Ppk (장기성능)", fmt(ppk, 2))
+        c5.metric("Sigma Level", f"{sigma_overall:.2f}σ" if sigma_overall is not None else "N/A")
 
         tab1, tab2, tab3 = st.tabs(["📊 공정능력 리포트", "📈 관리도", "📋 정규성 검정 리포트"])
 
         with tab1:
-            st.subheader("Process Capability Histogram", help="""
-**📊 공정능력 리포트란?**
-현재 공정이 고객이 요구하는 규격(LSL~USL) 내에서 제품을 얼마나 잘 생산할 수 있는지 보여줍니다.
-""")
+            st.subheader("Process Capability Histogram")
             if x_axis_mode == "자동 (Auto)":
                 d_min, d_max = data.min(), data.max()
                 d_range = d_max - d_min
@@ -305,7 +300,6 @@ if not data.empty:
                 bin_size = pretty_step
                 start_val = np.floor(d_min / bin_size) * bin_size - (bin_size / 2)
                 
-                # 규격이 없을 경우 데이터 최솟값/최댓값을 기준
                 plot_min_val = min(d_min, lsl) if lsl is not None else d_min
                 plot_max_val = max(d_max, usl) if usl is not None else d_max
                 
@@ -323,8 +317,9 @@ if not data.empty:
                 start_val = (np.floor(data.min() / bin_size) * bin_size) - (bin_size / 2)
                 display_dtick = x_step
 
+            # 정규분포 곡선 (미니탭처럼 Within StDev 기준으로 작도)
             x_curve = np.linspace(x_range_vals[0], x_range_vals[1], 500)
-            y_pdf = norm.pdf(x_curve, mean, std) * len(data) * bin_size
+            y_pdf_within = norm.pdf(x_curve, mean, std_within) * n_total * bin_size
 
             fig = go.Figure()
             fig.add_trace(go.Histogram(
@@ -332,8 +327,8 @@ if not data.empty:
                 marker=dict(color='#D6EAF8', line=dict(color='#2E86C1', width=1)),
                 name="Measured", hovertemplate="<b>중심: %{x:.3f}</b><br>Count: %{y}<extra></extra>"
             ))
-            fig.add_trace(go.Scatter(x=x_curve, y=y_pdf, mode='lines', line=dict(color='#1B4F72', width=3), 
-                                     name="Normal", hovertemplate="Normal Dist: %{y:.2f}<extra></extra>"))
+            fig.add_trace(go.Scatter(x=x_curve, y=y_pdf_within, mode='lines', line=dict(color='#1B4F72', width=3), 
+                                     name="Normal (Within)", hovertemplate="Normal Dist: %{y:.2f}<extra></extra>"))
 
             # 가이드라인 (값이 있는 것만 추가 & Target 글자 겹침 방지 적용)
             guides = []
@@ -349,7 +344,7 @@ if not data.empty:
 
             if y_axis_mode == "자동 (Auto)":
                 counts, _ = np.histogram(data, bins=np.arange(start_val, data.max() + bin_size*2, bin_size))
-                y_max_auto = max(np.max(counts), np.max(y_pdf)) * 1.15
+                y_max_auto = max(np.max(counts), np.max(y_pdf_within)) * 1.15
                 
                 st.session_state.auto_y_min = 0.0
                 st.session_state.auto_y_max = float(y_max_auto)
@@ -379,38 +374,28 @@ if not data.empty:
                 {"label": "LSL", "value": fmt(lsl, 3)},
                 {"label": "Target", "value": fmt(target, 3)},
                 {"label": "USL", "value": fmt(usl, 3)},
-                {"label": "Sample N", "value": f"{len(data)}"},
+                {"label": "Sample N", "value": f"{n_total}"},
                 {"label": "Mean", "value": fmt(mean, 3)},
-                {"label": "StDev", "value": fmt(std, 3)},
                 {"label": "", "value": "", "is_header": False},
-                {"label": "Capability", "is_header": True},
+                {"label": "Within (단기)", "is_header": True},
+                {"label": "StDev", "value": fmt(std_within, 4)},
                 {"label": "Cp", "value": fmt(cp, 2)},
                 {"label": "Cpk", "value": fmt(cpk, 2)},
-                {"label": "Sigma Level", "value": fmt(sigma_lvl, 2)},
+                {"label": "", "value": "", "is_header": False},
+                {"label": "Overall (장기)", "is_header": True},
+                {"label": "StDev", "value": fmt(std_overall, 4)},
+                {"label": "Pp", "value": fmt(pp, 2)},
+                {"label": "Ppk", "value": fmt(ppk, 2)},
             ]
             add_interactive_summary_box(fig, summary_items, fig_height=650)
 
             st.plotly_chart(fig, use_container_width=False, config={'toImageButtonOptions': {'filename': f'Process_Capability_{column_name}'}})
 
         with tab2:
-            st.subheader("Xbar-R Control Chart", help="""
-**📈 관리도(Control Chart)란?**
-공정이 시간 흐름에 따라 통계적으로 안정된 상태(관리 상태)인지 확인하는 도구입니다.
-""")
-            factors = {
-                2: (1.880, 3.267, 0),
-                3: (1.023, 2.574, 0),
-                4: (0.729, 2.282, 0),
-                5: (0.577, 2.114, 0),
-                6: (0.483, 2.004, 0),
-                7: (0.419, 1.924, 0.076),
-                8: (0.373, 1.864, 0.136),
-                9: (0.337, 1.816, 0.184),
-                10: (0.308, 1.777, 0.223) 
-            }
+            st.subheader("Control Chart", help="관리도 시료군 크기가 1이면 에러 방지를 위해 Xbar-R 차트는 그려지지 않습니다.")
             
             n = subgroup_size
-            if len(data) >= n * 2: 
+            if n > 1 and len(data) >= n * 2: 
                 num_subgroups = len(data) // n
                 subgroup_data = data.values[:num_subgroups * n].reshape(-1, n)
                 
@@ -418,7 +403,11 @@ if not data.empty:
                 ranges = subgroup_data.max(axis=1) - subgroup_data.min(axis=1)
                 subgroup_indices = np.arange(1, num_subgroups + 1)
                 
-                a2, d4, d3 = factors.get(n, (3/np.sqrt(n), 2.114, 0))
+                a2, d4, d3 = 3/np.sqrt(n), 2.114, 0
+                if n in D2_TABLE:
+                    factors = {2:(1.880,3.267,0), 3:(1.023,2.574,0), 4:(0.729,2.282,0), 5:(0.577,2.114,0), 6:(0.483,2.004,0), 7:(0.419,1.924,0.076), 8:(0.373,1.864,0.136), 9:(0.337,1.816,0.184), 10:(0.308,1.777,0.223)}
+                    a2, d4, d3 = factors.get(n)
+                    
                 x_double_bar = x_bars.mean()
                 r_bar = ranges.mean()
                 
@@ -429,70 +418,26 @@ if not data.empty:
                 r_colors = ['red' if (r > ucl_r or r < lcl_r) else '#2E86C1' for r in ranges]
         
                 from plotly.subplots import make_subplots
-                fig_c = make_subplots(
-                    rows=2, cols=1, 
-                    subplot_titles=("<b>Xbar Chart</b>", "<b>R Chart</b>"), 
-                    vertical_spacing=0.20, 
-                    shared_xaxes=False     
-                )
+                fig_c = make_subplots(rows=2, cols=1, subplot_titles=("<b>Xbar Chart</b>", "<b>R Chart</b>"), vertical_spacing=0.20, shared_xaxes=False)
                 
-                fig_c.add_trace(go.Scatter(
-                    x=subgroup_indices,
-                    y=x_bars, 
-                    mode='lines+markers', 
-                    line=dict(color='#2E86C1', width=1.5), 
-                    marker=dict(color=x_colors, size=6), 
-                    name="Xbar",
-                    hovertemplate="<b>Subgroup: %{x}</b><br>Mean: %{y:.3f}<extra></extra>"
-                ), row=1, col=1)
+                fig_c.add_trace(go.Scatter(x=subgroup_indices, y=x_bars, mode='lines+markers', line=dict(color='#2E86C1', width=1.5), marker=dict(color=x_colors, size=6), name="Xbar"), row=1, col=1)
+                fig_c.add_trace(go.Scatter(x=subgroup_indices, y=ranges, mode='lines+markers', line=dict(color='#2E86C1', width=1.5), marker=dict(color=r_colors, size=6), name="Range"), row=2, col=1)
                 
-                fig_c.add_trace(go.Scatter(
-                    x=subgroup_indices,
-                    y=ranges, 
-                    mode='lines+markers', 
-                    line=dict(color='#2E86C1', width=1.5), 
-                    marker=dict(color=r_colors, size=6), 
-                    name="Range",
-                    hovertemplate="<b>Subgroup: %{x}</b><br>Range: %{y:.3f}<extra></extra>"
-                ), row=2, col=1)
-                
-                def add_control_limit(fig, val, name, color, dash, row):
+                def add_cl(fig, val, name, color, dash, row):
                     fig.add_hline(y=val, line_dash=dash, line_color=color, line_width=1.5, row=row, col=1)
-                    fig.add_annotation(
-                        xref="paper", x=1.01, 
-                        y=val, yref=f"y{row}" if row==1 else "y2",
-                        text=f"<b>{name}</b>",
-                        showarrow=False,
-                        font=dict(color=color, size=12),
-                        xanchor="left", yanchor="middle"
-                    )
+                    fig.add_annotation(xref="paper", x=1.01, y=val, yref=f"y{row}" if row==1 else "y2", text=f"<b>{name}</b>", showarrow=False, font=dict(color=color, size=12), xanchor="left", yanchor="middle")
 
-                add_control_limit(fig_c, ucl_x, "UCL", "red", "dash", 1)
-                add_control_limit(fig_c, x_double_bar, "Mean", "green", "dash", 1)
-                add_control_limit(fig_c, lcl_x, "LCL", "red", "dash", 1)
+                add_cl(fig_c, ucl_x, "UCL", "red", "dash", 1)
+                add_cl(fig_c, x_double_bar, "Mean", "green", "dash", 1)
+                add_cl(fig_c, lcl_x, "LCL", "red", "dash", 1)
+                add_cl(fig_c, ucl_r, "UCL", "red", "dash", 2)
+                add_cl(fig_c, r_bar, "Rbar", "green", "dash", 2)
+                add_cl(fig_c, lcl_r, "LCL", "red", "dash", 2)
 
-                add_control_limit(fig_c, ucl_r, "UCL", "red", "dash", 2)
-                add_control_limit(fig_c, r_bar, "Rbar", "green", "dash", 2)
-                add_control_limit(fig_c, lcl_r, "LCL", "red", "dash", 2)
-
-                fig_c.update_layout(
-                    title=dict(text=f"<b>Control Charts for {column_name}</b>", x=0.5, xanchor='center', font=dict(size=24)),
-                    template="simple_white", 
-                    height=750, 
-                    width=1200, 
-                    showlegend=False, 
-                    margin=dict(l=60, r=220, t=100, b=80), 
-                    hovermode="x unified"
-                )
-                
-                fig_c.update_yaxes(title_text="Sample Mean", showgrid=True, gridcolor='#F2F3F4', row=1, col=1)
-                fig_c.update_xaxes(title_text="Subgroup Number", showgrid=True, gridcolor='#F2F3F4', row=1, col=1)
-                
-                fig_c.update_yaxes(title_text="Sample Range", showgrid=True, gridcolor='#F2F3F4', row=2, col=1)
-                fig_c.update_xaxes(title_text="Subgroup Number", showgrid=True, gridcolor='#F2F3F4', row=2, col=1)
+                fig_c.update_layout(title=dict(text=f"<b>Control Charts for {column_name}</b>", x=0.5, xanchor='center', font=dict(size=24)), template="simple_white", height=750, width=1200, showlegend=False, margin=dict(l=60, r=220, t=100, b=80), hovermode="x unified")
                 
                 summary_items = [
-                    {"label": "Control Chart Stats", "is_header": True},
+                    {"label": "Control Chart", "is_header": True},
                     {"label": "Subgroup Size", "value": f"{n}"},
                     {"label": "Sample N", "value": f"{len(data)}"},
                     {"label": "", "value": "", "is_header": False},
@@ -506,20 +451,14 @@ if not data.empty:
                     {"label": "R-bar", "value": f"{r_bar:.3f}"},
                     {"label": "LCL", "value": f"{lcl_r:.3f}"}
                 ]
-
                 add_interactive_summary_box(fig_c, summary_items, x_pos=1.06, fig_height=750)
-                
                 st.plotly_chart(fig_c, use_container_width=False, config={'toImageButtonOptions': {'filename': f'Control_Chart_{column_name}'}})
             else:
-                st.warning("데이터 개수가 부족하여 Xbar-R 관리도를 생성할 수 없습니다.")
+                st.warning("⚠️ 부분군 크기(Subgroup Size)가 1이거나 데이터가 부족하여 Xbar-R 관리도를 생성할 수 없습니다.")
 
         with tab3:
-            st.subheader("Probability Plot (Normality Test)", help="""
-**📋 정규성 검정(Probability Plot)이란?**
-수집된 데이터가 통계적으로 '정규분포(종 모양)'를 따르는지 검증합니다.
-""")
+            st.subheader("Probability Plot (Normality Test)")
             sorted_data = np.sort(data)
-            n_total = len(data)
             
             perc = (np.arange(1, n_total + 1) - 0.375) / (n_total + 0.25)
             theoretical_q = stats.norm.ppf(perc)
@@ -528,63 +467,21 @@ if not data.empty:
             ad_stat = ad_result.statistic
             p_val = stats.shapiro(data).pvalue
 
-            slope, intercept, r_val, _, _ = stats.linregress(sorted_data, theoretical_q)
+            slope, intercept, _, _, _ = stats.linregress(sorted_data, theoretical_q)
             
             prob_min, prob_max = 0.001, 0.999 
-            y_min_limit = stats.norm.ppf(prob_min)
-            y_max_limit = stats.norm.ppf(prob_max)
+            y_min_limit, y_max_limit = stats.norm.ppf(prob_min), stats.norm.ppf(prob_max)
+            x_start, x_end = (y_min_limit - intercept) / slope, (y_max_limit - intercept) / slope
             
-            x_start = (y_min_limit - intercept) / slope
-            x_end = (y_max_limit - intercept) / slope
-            
-            line_x = np.array([x_start, x_end])
-            line_y = slope * line_x + intercept
-
             fig_norm = go.Figure()
-
-            fig_norm.add_trace(go.Scatter(
-                x=sorted_data, 
-                y=theoretical_q, 
-                mode='markers',
-                marker=dict(color='#2E86C1', size=6, symbol='circle-open'), 
-                name="Data",
-                hovertemplate="<b>Value: %{x:.3f}</b><br>Percent: %{customdata:.1f}%<extra></extra>",
-                customdata=perc*100 
-            ))
-
-            fig_norm.add_trace(go.Scatter(
-                x=line_x, 
-                y=line_y, 
-                mode='lines',
-                line=dict(color='#E74C3C', width=2),
-                name="Fit Line",
-                hoverinfo='skip'
-            ))
+            fig_norm.add_trace(go.Scatter(x=sorted_data, y=theoretical_q, mode='markers', marker=dict(color='#2E86C1', size=6, symbol='circle-open'), name="Data", hovertemplate="<b>Value: %{x:.3f}</b><br>Percent: %{customdata:.1f}%<extra></extra>", customdata=perc*100))
+            fig_norm.add_trace(go.Scatter(x=np.array([x_start, x_end]), y=slope * np.array([x_start, x_end]) + intercept, mode='lines', line=dict(color='#E74C3C', width=2), name="Fit Line", hoverinfo='skip'))
 
             tick_probs = [0.001, 0.01, 0.05, 0.10, 0.20, 0.50, 0.80, 0.90, 0.95, 0.99, 0.999]
             tick_vals = stats.norm.ppf(tick_probs)
-            tick_text = []
-            for p in tick_probs:
-                val = p * 100
-                if val < 1 or val > 99:
-                    tick_text.append(f"{val:.1f}")
-                else:
-                    tick_text.append(f"{val:.0f}")
+            tick_text = [f"{p*100:.1f}" if (p*100 < 1 or p*100 > 99) else f"{p*100:.0f}" for p in tick_probs]
 
-            fig_norm.update_layout(
-                title=dict(text=f"<b>Probability Plot of {column_name}</b>", x=0.5, xanchor='center', font=dict(size=24)),
-                template="simple_white",
-                width=1200, height=650,
-                margin=dict(l=60, r=220, t=100, b=60),
-                showlegend=False,
-                xaxis=dict(title=x_axis_title, showgrid=True, gridcolor='#F2F3F4'),
-                yaxis=dict(
-                    title="Percent", 
-                    tickmode='array', tickvals=tick_vals, ticktext=tick_text,
-                    range=[y_min_limit, y_max_limit], 
-                    showgrid=True, gridcolor='#F2F3F4', zeroline=False
-                )
-            )
+            fig_norm.update_layout(title=dict(text=f"<b>Probability Plot of {column_name}</b>", x=0.5, xanchor='center', font=dict(size=24)), template="simple_white", width=1200, height=650, margin=dict(l=60, r=220, t=100, b=60), showlegend=False, xaxis=dict(title=x_axis_title, showgrid=True, gridcolor='#F2F3F4'), yaxis=dict(title="Percent", tickmode='array', tickvals=tick_vals, ticktext=tick_text, range=[y_min_limit, y_max_limit], showgrid=True, gridcolor='#F2F3F4', zeroline=False))
 
             summary_items = [
                 {"label": "Normality Test", "is_header": True},
@@ -592,12 +489,11 @@ if not data.empty:
                 {"label": "P-Value", "value": f"{p_val:.4f}"},
                 {"label": "", "value": "", "is_header": False},
                 {"label": "Stats", "is_header": True},
-                {"label": "Mean", "value": f"{mean:.3f}"},
-                {"label": "StDev", "value": f"{std:.3f}"},
-                {"label": "Sample N", "value": f"{len(data)}"},
+                {"label": "Mean", "value": fmt(mean, 3)},
+                {"label": "StDev", "value": fmt(std_overall, 3)},
+                {"label": "Sample N", "value": f"{n_total}"},
             ]
             add_interactive_summary_box(fig_norm, summary_items, fig_height=650)
-            
             st.plotly_chart(fig_norm, use_container_width=False, config={'toImageButtonOptions': {'filename': f'Probability_Plot_{column_name}'}})    
             
         st.write("---")
@@ -606,37 +502,23 @@ if not data.empty:
             {"Report": "Process Capability", "Category": "Specs", "Metric": "LSL", "Value": fmt(lsl, 3)},
             {"Report": "Process Capability", "Category": "Specs", "Metric": "Target", "Value": fmt(target, 3)},
             {"Report": "Process Capability", "Category": "Specs", "Metric": "USL", "Value": fmt(usl, 3)},
-            {"Report": "Process Capability", "Category": "Process Data", "Metric": "Sample N", "Value": f"{len(data)}"},
-            {"Report": "Process Capability", "Category": "Process Data", "Metric": "Mean", "Value": fmt(mean, 3)},
-            {"Report": "Process Capability", "Category": "Process Data", "Metric": "StdDev", "Value": fmt(std, 3)},
-            {"Report": "Process Capability", "Category": "Capability", "Metric": "Cp", "Value": fmt(cp, 2)},
-            {"Report": "Process Capability", "Category": "Capability", "Metric": "Cpk", "Value": fmt(cpk, 2)},
-            {"Report": "Process Capability", "Category": "Capability", "Metric": "Sigma Level", "Value": fmt(sigma_lvl, 2)},
-            
-            {"Report": "Control Chart", "Category": "Settings", "Metric": "Subgroup Size", "Value": f"{subgroup_size}"},
-            {"Report": "Control Chart", "Category": "Xbar Limits", "Metric": "UCL", "Value": f"{ucl_x:.3f}"},
-            {"Report": "Control Chart", "Category": "Xbar Limits", "Metric": "CL (Mean)", "Value": f"{x_double_bar:.3f}"},
-            {"Report": "Control Chart", "Category": "Xbar Limits", "Metric": "LCL", "Value": f"{lcl_x:.3f}"},
-            {"Report": "Control Chart", "Category": "R Limits", "Metric": "UCL", "Value": f"{ucl_r:.3f}"},
-            {"Report": "Control Chart", "Category": "R Limits", "Metric": "CL (R-bar)", "Value": f"{r_bar:.3f}"},
-            {"Report": "Control Chart", "Category": "R Limits", "Metric": "LCL", "Value": f"{lcl_r:.3f}"}, 
-
+            {"Report": "Process Capability", "Category": "Data", "Metric": "Sample N", "Value": f"{n_total}"},
+            {"Report": "Process Capability", "Category": "Data", "Metric": "Mean", "Value": fmt(mean, 3)},
+            {"Report": "Process Capability", "Category": "Within (Short-Term)", "Metric": "StDev (Within)", "Value": fmt(std_within, 4)},
+            {"Report": "Process Capability", "Category": "Within (Short-Term)", "Metric": "Cp", "Value": fmt(cp, 2)},
+            {"Report": "Process Capability", "Category": "Within (Short-Term)", "Metric": "Cpk", "Value": fmt(cpk, 2)},
+            {"Report": "Process Capability", "Category": "Overall (Long-Term)", "Metric": "StDev (Overall)", "Value": fmt(std_overall, 4)},
+            {"Report": "Process Capability", "Category": "Overall (Long-Term)", "Metric": "Pp", "Value": fmt(pp, 2)},
+            {"Report": "Process Capability", "Category": "Overall (Long-Term)", "Metric": "Ppk", "Value": fmt(ppk, 2)},
             {"Report": "Normality Test", "Category": "Test Result", "Metric": "AD Stat", "Value": f"{ad_stat:.3f}"},
             {"Report": "Normality Test", "Category": "Test Result", "Metric": "P-Value", "Value": f"{p_val:.4f}"}
         ]
         
-        # 1. 요약 데이터를 CSV 문자열로 변환
         df_res = pd.DataFrame(summary_data)
         csv_summary = df_res.to_csv(index=False)
-        
-        # 2. 원본(Raw) 데이터를 데이터프레임으로 만들고 CSV 문자열로 변환
         df_raw = pd.DataFrame({f"Raw Data ({column_name})": data.values})
         csv_raw = df_raw.to_csv(index=False)
-        
-        # 3. 두 CSV 문자열을 결합 (중간에 빈 줄 삽입하여 엑셀에서 보기 좋게 분리)
-        final_csv_str = csv_summary + "\n" + csv_raw
-        
-        # 한글 깨짐 방지를 위해 utf-8-sig로 인코딩
+        final_csv_str = csv_summary + "\n\n" + csv_raw
         csv_bytes = final_csv_str.encode('utf-8-sig')
         
         st.download_button(
