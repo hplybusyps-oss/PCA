@@ -183,17 +183,21 @@ with st.sidebar:
     st.write("**[X축 설정]**")
     x_axis_mode = st.radio("X축 범위 모드", ["자동 (Auto)", "수동 (Manual)"])
     if x_axis_mode == "수동 (Manual)":
-        x_min_val = st.number_input("X축 최소값", value=lsl - 0.05, format="%.3f")
-        x_max_val = st.number_input("X축 최대값", value=usl + 0.05, format="%.3f")
-        x_step = st.number_input("X축 눈금 단위 (Bin Size)", value=0.020, format="%.3f", min_value=0.001)    
+        # --- [수정됨] 세션 상태에 저장된 자동 계산 값을 기본값으로 불러옵니다. ---
+        x_min_val = st.number_input("X축 최소값", value=st.session_state.get('auto_x_min', lsl - 0.05), format="%.3f")
+        x_max_val = st.number_input("X축 최대값", value=st.session_state.get('auto_x_max', usl + 0.05), format="%.3f")
+        x_step = st.number_input("X축 눈금 단위 (Bin Size)", value=st.session_state.get('auto_x_step', 0.020), format="%.3f", min_value=0.001)
+    
     x_axis_title = st.text_input("X축 제목", value="Measurement Value")
 
-    st.write("**[Y축 설정]**")
+    st.write("**[Y축 설정 (Histogram)]**")
     y_axis_mode = st.radio("Y축 범위 모드", ["자동 (Auto)", "수동 (Manual)"])
     if y_axis_mode == "수동 (Manual)":
-        y_min_val = st.number_input("Y축 최소값", value=0.0, format="%.1f")
-        y_max_val = st.number_input("Y축 최대값", value=500.0, format="%.1f")
-        y_step = st.number_input("Y축 눈금 단위", value=50.0, format="%.1f", min_value=0.1)
+        # --- [수정됨] 세션 상태에 저장된 자동 계산 값을 기본값으로 불러옵니다. ---
+        y_min_val = st.number_input("Y축 최소값", value=st.session_state.get('auto_y_min', 0.0), format="%.1f")
+        y_max_val = st.number_input("Y축 최대값", value=st.session_state.get('auto_y_max', 500.0), format="%.1f")
+        y_step = st.number_input("Y축 눈금 단위", value=st.session_state.get('auto_y_step', 50.0), format="%.1f", min_value=0.1)
+        
     y_axis_title = st.text_input("Y축 제목", value="Frequency")    
     
     st.write("---")
