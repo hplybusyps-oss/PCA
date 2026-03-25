@@ -192,9 +192,9 @@ with st.sidebar:
     if x_axis_mode == "수동 (Manual)":
         x_min_default = lsl - 0.05 if lsl is not None else 0.0
         x_max_default = usl + 0.05 if usl is not None else 1.0
-        x_min_val = st.number_input("X축 최소값", value=st.session_state.get('auto_x_min', x_min_default), format="%.3f")
-        x_max_val = st.number_input("X축 최대값", value=st.session_state.get('auto_x_max', x_max_default), format="%.3f")
-        x_step = st.number_input("X축 눈금 단위 (Bin Size)", value=st.session_state.get('auto_x_step', 0.020), format="%.3f", min_value=0.001)
+        x_min_val = st.number_input("X축 최소값", value=st.session_state.get('auto_x_min', x_min_default), format="%.5f")
+        x_max_val = st.number_input("X축 최대값", value=st.session_state.get('auto_x_max', x_max_default), format="%.5f")
+        x_step = st.number_input("X축 눈금 단위 (Bin Size)", value=st.session_state.get('auto_x_step', 0.020), format="%.5f", min_value=0.00001)
     
     x_axis_title = st.text_input("X축 제목", value="Measurement Value")
 
