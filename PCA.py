@@ -117,7 +117,7 @@ st.markdown("""
     div[data-baseweb="popover"] { min-width: 500px !important; max-width: 800px !important; }
     </style>
     """, unsafe_allow_html=True)
-st.title("📊 Process Capability Analysis v0.4 (Minitab Pooled Std.)")
+st.title("📊 Process Capability Analysis v0.4")
 
 # 3. 데이터 가이드 섹션
 with st.expander("ℹ️ 데이터 입력 형식 가이드 & 예시 파일 다운로드 (Click)", expanded=False):
