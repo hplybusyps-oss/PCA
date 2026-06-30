@@ -288,7 +288,7 @@ if not data.empty:
         st.write("**[ 장기 공정능력 (Overall) - 전체 산포 반영 ]**")
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("부분군 크기 (n)", f"{n_sub}")
-        c2.metric("LSL / USL", f"{fmt(lsl, 1)} / {fmt(usl, 1)}")
+        c2.metric("LSL / USL", f"{fmt(lsl, 3)} / {fmt(usl, 3)}")
         c3.metric("StDev (Overall)", fmt(std_overall, 4))
         c4.metric("Ppk (장기성능)", fmt(ppk, 2))
         c5.metric("Sigma Level", f"{sigma_overall:.2f}σ" if sigma_overall is not None else "N/A")
