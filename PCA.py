@@ -37,7 +37,7 @@ def get_c4(n):
     if n <= 1: return 1.0
     return math.sqrt(2.0/(n-1)) * math.exp(math.lgamma(n/2.0) - math.lgamma((n-1)/2.0))
 
-def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height=650):
+def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height=650, box_width=0.145):
     PX_LINE_HEIGHT = 28     
     PX_SECTION_GAP = 5      
     PX_PADDING = 15         
@@ -63,7 +63,7 @@ def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height
     fig.add_shape(
         type="rect", xref="paper", yref="paper",
         x0=x_pos, 
-        x1=x_pos + 0.145, 
+        x1=x_pos + box_width, 
         y0=box_y_bottom, 
         y1=box_y_top,
         fillcolor="white", 
@@ -367,14 +367,18 @@ if not data.empty:
                 else: pretty_y_step = 10.0 * mag_y
                 st.session_state.auto_y_step = float(pretty_y_step)
 
-                y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[0, y_max_auto], autorange=False, rangemode="nonnegative")
+                y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', dtick=pretty_y_step,
+                                    minor=dict(showgrid=True, gridcolor='#F8F9F9', dtick=pretty_y_step / 2),
+                                    range=[0, y_max_auto], autorange=False, rangemode="nonnegative")
             else:
-                y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step, autorange=False)
+                y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step,
+                                    minor=dict(showgrid=True, gridcolor='#F8F9F9', dtick=y_step / 2), autorange=False)
 
             fig.update_layout(
                 title=dict(text=f"Process Capability Report for {column_name}", x=0.5, xanchor='center', font=dict(size=24)),
                 template="simple_white", hovermode="x",
-                xaxis=dict(title=x_axis_title, dtick=display_dtick, range=x_range_vals, showgrid=True, gridcolor='#F2F3F4'),
+                xaxis=dict(title=x_axis_title, dtick=display_dtick, range=x_range_vals, showgrid=True, gridcolor='#F2F3F4',
+                           minor=dict(showgrid=True, gridcolor='#F8F9F9', dtick=display_dtick / 2)),
                 yaxis=y_axis_setup, 
                 width=750, height=650, margin=dict(l=60, r=220, t=120, b=60), showlegend=False
             )
@@ -397,7 +401,7 @@ if not data.empty:
                 {"label": "Pp", "value": fmt(pp, 2)},
                 {"label": "Ppk", "value": fmt(ppk, 2)},
             ]
-            add_interactive_summary_box(fig, summary_items, fig_height=650)
+            add_interactive_summary_box(fig, summary_items, fig_height=650, box_width=0.38)
             st.plotly_chart(fig, use_container_width=False, config={'toImageButtonOptions': {'filename': f'Process_Capability_{column_name}'}})
 
         with tab2:
