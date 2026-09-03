@@ -376,7 +376,7 @@ if not data.empty:
                 template="simple_white", hovermode="x",
                 xaxis=dict(title=x_axis_title, dtick=display_dtick, range=x_range_vals, showgrid=True, gridcolor='#F2F3F4'),
                 yaxis=y_axis_setup, 
-                width=1200, height=650, margin=dict(l=60, r=220, t=120, b=60), showlegend=False
+                width=750, height=650, margin=dict(l=60, r=220, t=120, b=60), showlegend=False
             )
             
             summary_items = [
