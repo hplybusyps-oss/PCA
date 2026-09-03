@@ -37,8 +37,8 @@ def get_c4(n):
     if n <= 1: return 1.0
     return math.sqrt(2.0/(n-1)) * math.exp(math.lgamma(n/2.0) - math.lgamma((n-1)/2.0))
 
-def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height=650, box_width=0.145):
-    PX_LINE_HEIGHT = 28     
+def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height=650, box_width=0.145, summary_font_size=None):
+    PX_LINE_HEIGHT = max(28, (summary_font_size or 13) + 10)
     PX_SECTION_GAP = 5      
     PX_PADDING = 15         
 
@@ -80,11 +80,11 @@ def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height
 
         if is_header:
             text_str = f"<b>{label}</b>"
-            font_size = 13
+            font_size = summary_font_size if summary_font_size is not None else 13
             hover_text = None 
         else:
             text_str = f"{label}: {val}"
-            font_size = 12
+            font_size = summary_font_size if summary_font_size is not None else 12
             key_full = label
             key_short = label.split(" (")[0]
             hover_text = TOOLTIPS.get(key_full, TOOLTIPS.get(key_short, text_str))
@@ -184,6 +184,13 @@ with st.sidebar:
         y_step = st.number_input("Y축 눈금 단위", value=st.session_state.get('auto_y_step', 5.0), format="%.1f", min_value=0.1)
         
     y_axis_title = st.text_input("Y축 제목", value="Frequency")    
+
+    with st.expander("🔤 공정능력 그래프 글씨 크기", expanded=False):
+        capability_title_font_size = st.number_input("그래프 제목", min_value=12, max_value=40, value=24, step=1)
+        capability_x_font_size = st.number_input("X축 글씨", min_value=8, max_value=24, value=12, step=1)
+        capability_y_font_size = st.number_input("Y축 글씨", min_value=8, max_value=24, value=12, step=1)
+        capability_guide_font_size = st.number_input("LSL / Mean / USL 글씨", min_value=8, max_value=24, value=12, step=1)
+        capability_summary_font_size = st.number_input("Process Data 글씨", min_value=8, max_value=18, value=12, step=1)
     
     st.write("---")
     subgroup_size = st.number_input("관리도 및 군내변동 시료군(n) 크기", value=5, min_value=1, help="1로 설정 시 이동범위(Moving Range) 방식 적용")
@@ -353,7 +360,7 @@ if not data.empty:
             for val, name, color, y_pos in guides:
                 fig.add_vline(x=val, line_dash="dash", line_color=color, line_width=1.5)
                 fig.add_annotation(x=val, y=y_pos, yref="paper", text=f"<b>{name}</b>", 
-                                   showarrow=False, font=dict(color=color, size=12), yanchor="bottom")
+                                   showarrow=False, font=dict(color=color, size=capability_guide_font_size), yanchor="bottom")
 
             if y_axis_mode == "자동 (Auto)":
                 counts, _ = np.histogram(data, bins=np.arange(start_val, data.max() + bin_size*2, bin_size))
@@ -370,17 +377,20 @@ if not data.empty:
                 else: pretty_y_step = 10.0 * mag_y
                 st.session_state.auto_y_step = float(pretty_y_step)
 
-                y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', dtick=pretty_y_step,
+                y_axis_setup = dict(title=dict(text=y_axis_title, font=dict(size=capability_y_font_size)),
+                                    tickfont=dict(size=capability_y_font_size), showgrid=True, gridcolor='#F2F3F4', dtick=pretty_y_step,
                                     minor=dict(showgrid=True, gridcolor='#F8F9F9', dtick=pretty_y_step / 2),
                                     range=[0, y_max_auto], autorange=False, rangemode="nonnegative")
             else:
-                y_axis_setup = dict(title=y_axis_title, showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step,
+                y_axis_setup = dict(title=dict(text=y_axis_title, font=dict(size=capability_y_font_size)),
+                                    tickfont=dict(size=capability_y_font_size), showgrid=True, gridcolor='#F2F3F4', range=[y_min_val, y_max_val], dtick=y_step,
                                     minor=dict(showgrid=True, gridcolor='#F8F9F9', dtick=y_step / 2), autorange=False)
 
             fig.update_layout(
-                title=dict(text=f"Process Capability Report for {column_name}", x=0.5, xanchor='center', font=dict(size=24)),
+                title=dict(text=f"Process Capability Report for {column_name}", x=0.5, xanchor='center', font=dict(size=capability_title_font_size)),
                 template="simple_white", hovermode="x",
-                xaxis=dict(title=x_axis_title, dtick=display_dtick, range=x_range_vals, showgrid=True, gridcolor='#F2F3F4',
+                xaxis=dict(title=dict(text=x_axis_title, font=dict(size=capability_x_font_size)),
+                           tickfont=dict(size=capability_x_font_size), dtick=display_dtick, range=x_range_vals, showgrid=True, gridcolor='#F2F3F4',
                            minor=dict(showgrid=True, gridcolor='#F8F9F9', dtick=display_dtick / 2)),
                 yaxis=y_axis_setup, 
                 width=750, height=650, margin=dict(l=60, r=220, t=120, b=60), showlegend=False
@@ -404,7 +414,8 @@ if not data.empty:
                 {"label": "Pp", "value": fmt(pp, 2)},
                 {"label": "Ppk", "value": fmt(ppk, 2)},
             ]
-            add_interactive_summary_box(fig, summary_items, fig_height=650, box_width=0.38)
+            add_interactive_summary_box(fig, summary_items, fig_height=650, box_width=0.38,
+                                        summary_font_size=capability_summary_font_size)
             st.plotly_chart(fig, use_container_width=False, config={'toImageButtonOptions': {'filename': f'Process_Capability_{column_name}'}})
 
         with tab2:
