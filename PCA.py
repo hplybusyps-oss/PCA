@@ -171,7 +171,8 @@ with st.sidebar:
         x_max_default = usl + 5.0 if usl is not None else 50.0
         x_min_val = st.number_input("X축 최소값", value=st.session_state.get('auto_x_min', x_min_default), format="%.5f")
         x_max_val = st.number_input("X축 최대값", value=st.session_state.get('auto_x_max', x_max_default), format="%.5f")
-        x_step = st.number_input("X축 눈금 단위 (Bin Size)", value=st.session_state.get('auto_x_step', 1.0), format="%.5f", min_value=0.00001)
+        x_tick_step = st.number_input("X축 표시 눈금 단위", value=st.session_state.get('auto_x_tick_step', st.session_state.get('auto_x_step', 1.0)), format="%.5f", min_value=0.00001)
+        manual_bin_size = st.number_input("히스토그램 막대 구간 (Bin Size)", value=st.session_state.get('auto_bin_size', st.session_state.get('auto_x_step', 1.0)), format="%.5f", min_value=0.00001)
     
     x_axis_title = st.text_input("X축 제목", value="Measurement Value")
 
@@ -322,11 +323,13 @@ if not data.empty:
                 st.session_state.auto_x_min = float(plot_min)
                 st.session_state.auto_x_max = float(plot_max)
                 st.session_state.auto_x_step = float(bin_size)
+                st.session_state.auto_x_tick_step = float(display_dtick)
+                st.session_state.auto_bin_size = float(bin_size)
             else:
                 x_range_vals = [x_min_val, x_max_val]
-                bin_size = x_step
+                bin_size = manual_bin_size
                 start_val = (np.floor(data.min() / bin_size) * bin_size) - (bin_size / 2)
-                display_dtick = x_step
+                display_dtick = x_tick_step
 
             # 정규분포 곡선 (미니탭처럼 Within StDev 기준으로 작도)
             x_curve = np.linspace(x_range_vals[0], x_range_vals[1], 500)
