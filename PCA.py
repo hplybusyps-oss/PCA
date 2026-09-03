@@ -37,9 +37,10 @@ def get_c4(n):
     if n <= 1: return 1.0
     return math.sqrt(2.0/(n-1)) * math.exp(math.lgamma(n/2.0) - math.lgamma((n-1)/2.0))
 
-def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height=650, box_width=0.145, summary_font_size=None):
-    PX_LINE_HEIGHT = max(28, (summary_font_size or 13) + 10)
-    PX_SECTION_GAP = 5      
+def add_interactive_summary_box(fig, lines, x_pos=1.02, y_center=0.5, fig_height=650, box_width=0.145,
+                                summary_font_size=None, line_spacing_scale=1.0, section_gap_lines=None):
+    PX_LINE_HEIGHT = max(28, (summary_font_size or 13) + 10) * line_spacing_scale
+    PX_SECTION_GAP = PX_LINE_HEIGHT * section_gap_lines if section_gap_lines is not None else 5
     PX_PADDING = 15         
 
     line_height_rel = PX_LINE_HEIGHT / fig_height
@@ -415,7 +416,8 @@ if not data.empty:
                 {"label": "Ppk", "value": fmt(ppk, 2)},
             ]
             add_interactive_summary_box(fig, summary_items, fig_height=650, box_width=0.38,
-                                        summary_font_size=capability_summary_font_size)
+                                        summary_font_size=capability_summary_font_size,
+                                        line_spacing_scale=1.2, section_gap_lines=1.0)
             st.plotly_chart(fig, use_container_width=False, config={'toImageButtonOptions': {'filename': f'Process_Capability_{column_name}'}})
 
         with tab2:
