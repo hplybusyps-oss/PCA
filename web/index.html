@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>Process Capability Analysis-HJ</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@stlite/browser@1.9.2/build/stlite.css">
+  <style>
+    body { margin: 0; background: #fff; }
+    #boot {
+      position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 10px; font: 15px "Malgun Gothic", system-ui, sans-serif; color: #444; background: #fff; z-index: 10;
+      padding: 16px; text-align: center;
+    }
+    #boot small { color: #888; }
+  </style>
+</head>
+<body>
+  <div id="boot">
+    <div>📊 Process Capability Analysis 불러오는 중...</div>
+    <small>브라우저에서 Python 을 실행합니다. 첫 방문은 20~40초, 이후에는 더 빨리 열립니다.<br>업로드한 파일은 서버로 전송되지 않고 이 브라우저 안에서만 계산됩니다.</small>
+  </div>
+  <div id="root"></div>
+  <script type="module">
+    import { mount } from "https://cdn.jsdelivr.net/npm/@stlite/browser@1.9.2/build/stlite.js";
+
+    const v = "__BUILD_ID__";   // 배포마다 바뀜 → 브라우저 캐시 무효화
+    mount(
+      {
+        requirements: ["scipy", "plotly", "openpyxl"],
+        entrypoint: "PCA.py",
+        files: {
+          "PCA.py": { url: `./PCA.py?v=${v}` },
+        },
+      },
+      document.getElementById("root"),
+    );
+
+    // Streamlit 화면이 그려지면 안내 문구 제거
+    const hide = () => document.getElementById("boot")?.remove();
+    new MutationObserver((_, obs) => {
+      if (document.querySelector('[data-testid="stAppViewContainer"]')) { hide(); obs.disconnect(); }
+    }).observe(document.getElementById("root"), { childList: true, subtree: true });
+    setTimeout(hide, 90000);
+  </script>
+</body>
+</html>

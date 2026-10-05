@@ -1,0 +1,42 @@
+name: 브라우저 버전 배포
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'PCA.py'
+      - 'web/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 앱 파일 복사
+        run: |
+          cp PCA.py web/
+          sed -i "s/__BUILD_ID__/${GITHUB_SHA::8}-${GITHUB_RUN_ID}/" web/index.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

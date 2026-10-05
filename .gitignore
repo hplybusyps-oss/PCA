@@ -205,3 +205,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# 브라우저 버전 배포 시 복사되는 파일
+web/PCA.py
